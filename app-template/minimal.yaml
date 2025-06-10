@@ -25,7 +25,7 @@ metadata:
     challenge.app: examples-app
   name: examples-app
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       challenge.app: examples-app
@@ -76,17 +76,25 @@ kind: Ingress
 metadata:
   name: examples-app-ingress
   namespace: default
+  annotations:
+    # traefik.ingress.kubernetes.io/router.tls: "true"
+    # traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    cert-manager.io/cluster-issuer: letsencrypt-staging-traefik
 spec:
-  ingressClassName: external # fix this
+  ingressClassName: traefik # fix this
   rules:
     - host: examples.app.com
       http:
         paths:
           - path: /
-            pathType: ImplementationSpecific
+            pathType: Prefix
             backend:
               service:
                 name: examples-app
                 port:
                   number: 80
+  # tls:
+  #   - hosts:
+  #       - examples.app.com
+  #     secretName: examples-app-tls
 ---

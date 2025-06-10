@@ -52,13 +52,14 @@ delete/cluster:
 install/certmanager: create/cluster
 	$(call assert-set,KUBECTL)
 	@echo -e "\\033[1;32mInstalling cert-manager\\033[0;39m"
-	@$(KUBECTL) apply -f https://github.com/jetstack/cert-manager/releases/download/v1.15.0/cert-manager.yaml
+	@$(KUBECTL) apply -f https://github.com/jetstack/cert-manager/releases/download/v1.17.2/cert-manager.yaml
 	@$(KUBECTL) -n cert-manager wait --for condition=available --timeout=90s deploy -lapp.kubernetes.io/instance=cert-manager
 	@$(ENVSUBST) < k8s/02_certmanager-resources.yaml | $(KUBECTL) apply -f -
 
 install/loadbalancer: install/kube-vip
 	$(call assert-set,KUBECTL)
 	@echo -e "\\033[1;32mInstalling traefik\\033[0;39m"
+	@$(KUBECTL) apply -f k8s/03_traefik/00_gateway_crd.yml
 	@$(KUBECTL) apply -f k8s/03_traefik/00_traefik_crd.yml
 	@$(ENVSUBST) < k8s/03_traefik/01_traefik_workload.yaml | cat > /tmp/01_traefik_workload.yaml
 	@$(KUBECTL) apply -f /tmp/01_traefik_workload.yaml

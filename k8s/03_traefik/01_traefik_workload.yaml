@@ -17,24 +17,49 @@ metadata:
   namespace: infrastructure
   labels:
     app.kubernetes.io/name: traefik
-    app.kubernetes.io/instance: traefik
+    app.kubernetes.io/instance: traefik-infrastructure
 spec:
-  maxUnavailable: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: traefik
-      app.kubernetes.io/instance: traefik
+      app.kubernetes.io/instance: traefik-infrastructure
+  minAvailable: 1
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+apiVersion: v1
+kind: ServiceAccount
 metadata:
+  namespace: infrastructure
   name: traefik-ingress-controller
+---
+# Source: traefik/templates/rbac/clusterrole.yaml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: traefik-infrastructure
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-infrastructure
 rules:
   - apiGroups:
       - ""
     resources:
+      - configmaps
+      - nodes
       - services
-      - endpoints
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - discovery.k8s.io
+    resources:
+      - endpointslices
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
       - secrets
     verbs:
       - get
@@ -44,8 +69,8 @@ rules:
       - extensions
       - networking.k8s.io
     resources:
-      - ingresses
       - ingressclasses
+      - ingresses
     verbs:
       - get
       - list
@@ -59,35 +84,136 @@ rules:
       - update
   - apiGroups:
       - traefik.io
-      - traefik.containo.us
     resources:
-      - middlewares
-      - middlewaretcps
       - ingressroutes
-      - traefikservices
       - ingressroutetcps
       - ingressrouteudps
+      - middlewares
+      - middlewaretcps
+      - serverstransports
+      - serverstransporttcps
       - tlsoptions
       - tlsstores
-      - serverstransports
+      - traefikservices
     verbs:
       - get
       - list
       - watch
-
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+      - secrets
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - gateway.networking.k8s.io
+    resources:
+      - backendtlspolicies
+      - gatewayclasses
+      - gateways
+      - grpcroutes
+      - httproutes
+      - referencegrants
+      - tcproutes
+      - tlsroutes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - gateway.networking.k8s.io
+    resources:
+      - backendtlspolicies/status
+      - gatewayclasses/status
+      - gateways/status
+      - grpcroutes/status
+      - httproutes/status
+      - tcproutes/status
+      - tlsroutes/status
+    verbs:
+      - update
 ---
-apiVersion: rbac.authorization.k8s.io/v1
+# Source: traefik/templates/rbac/clusterrolebinding.yaml
 kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: traefik-ingress-controller
+  name: traefik-infrastructure
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-infrastructure
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: traefik-ingress-controller
+  name: traefik-infrastructure
 subjects:
   - kind: ServiceAccount
     name: traefik-ingress-controller
     namespace: infrastructure
+---
+# Source: traefik/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+  namespace: infrastructure
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-infrastructure
+  annotations:
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-infrastructure
+  ports:
+  - port: 80
+    name: web
+    targetPort: web
+    protocol: TCP
+    nodePort: 30080
+  - port: 443
+    name: websecure
+    targetPort: websecure
+    protocol: TCP
+    nodePort: 30443
+  - port: 7000
+    name: udpep
+    targetPort: "udpep"
+    protocol: "UDP"
+    nodePort: 32700
+  - port: 6000
+    name: tcpep
+    targetPort: "tcpep"
+    protocol: "TCP"
+    nodePort: 32600
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-internal
+  namespace: infrastructure
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik
+    app.kubernetes.io/usage: metrics
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-infrastructure
+  ports:
+    - port: 8080
+      name: traefik
+      targetPort: "traefik"
+      protocol: "TCP"
+    - port: 9100
+      name: metrics
+      targetPort: "metrics"
+      protocol: "TCP"
 ---
 # Source: traefik/templates/deployment.yaml
 apiVersion: apps/v1
@@ -97,145 +223,137 @@ metadata:
   namespace: infrastructure
   labels:
     app.kubernetes.io/name: traefik
-    app.kubernetes.io/instance: traefik
-  annotations: {}
+    app.kubernetes.io/instance: traefik-infrastructure
+  annotations:
 spec:
-  replicas: 2
+  replicas: 1
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app.kubernetes.io/name: traefik
-      app.kubernetes.io/instance: traefik
+      app.kubernetes.io/instance: traefik-infrastructure
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 2
       maxUnavailable: 0
+      maxSurge: 1
+  minReadySeconds: 0
   template:
     metadata:
-      annotations: {}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "9100"
       labels:
         app.kubernetes.io/name: traefik
-        app.kubernetes.io/instance: traefik
+        app.kubernetes.io/instance: traefik-infrastructure
     spec:
       serviceAccountName: traefik-ingress-controller
+      automountServiceAccountToken: true
       terminationGracePeriodSeconds: 60
       hostNetwork: false
       containers:
-        - image: "traefik:2"
-          imagePullPolicy: IfNotPresent
-          name: traefik
-          env:
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: status.hostIP
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: metadata.name
-          resources:
-            limits:
-              cpu: 300m
-              memory: 300Mi
-            requests:
-              cpu: 100m
-              memory: 200Mi
-          readinessProbe:
-            httpGet:
-              path: /ping
-              port: 9000
-            failureThreshold: 1
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 2
-          livenessProbe:
-            httpGet:
-              path: /ping
-              port: 9000
-            failureThreshold: 3
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 2
-          ports:
-            - name: "traefik"
-              containerPort: 9000
-              protocol: "TCP"
-            - name: "web"
-              containerPort: 8000
-              protocol: "TCP"
-            - name: "websecure"
-              containerPort: 8443
-              protocol: "TCP"
-            - name: "metrics"
-              containerPort: 8082
-              protocol: "TCP"
-            - name: udpep
-              containerPort: 7000
-              protocol: "UDP"
-            - name: tcpep
-              containerPort: 6000
-              protocol: "TCP"
-          securityContext:
-            capabilities:
-              drop:
-                - ALL
-            readOnlyRootFilesystem: true
-            runAsGroup: 65532
-            runAsNonRoot: true
-            runAsUser: 65532
-          volumeMounts:
-            - name: data
-              mountPath: /data
-            - name: tmp
-              mountPath: /tmp
-          args:
-            - "--metrics.prometheus=true"
-            - "--global.sendAnonymousUsage=false"
-            - "--metrics.prometheus.entryPoint=metrics"
-            - "--entrypoints.udpep.address=:7000/udp"
-            - "--entrypoints.tcpep.address=:6000/tcp"
-            - "--entryPoints.metrics.address=:8082"
-            - "--entryPoints.traefik.address=:9000/tcp"
-            - "--entryPoints.web.address=:8000/tcp"
-#           - "--entryPoints.web.forwardedHeaders.insecure=true"
-#            - "--entryPoints.web.proxyProtocol.insecure=true"
-            - "--entryPoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/16,${CURRENT_EXTERNAL_IP}"
-            - "--entryPoints.web.proxyProtocol.trustedIPs=127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/16,${CURRENT_EXTERNAL_IP}"
-            - "--entryPoints.websecure.address=:8443/tcp"
-#            - "--entryPoints.websecure.forwardedHeaders.insecure=true"
-#            - "--entryPoints.websecure.proxyProtocol.insecure=true"
-            - "--entryPoints.websecure.forwardedHeaders.trustedIPs=127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/16,${CURRENT_EXTERNAL_IP}"
-            - "--entryPoints.websecure.proxyProtocol.trustedIPs=127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/16,${CURRENT_EXTERNAL_IP}"
-            - "--entryPoints.websecure.http.tls"
-            - "--api.dashboard=true"
-            - "--api.insecure=true"
-            - "--ping=true"
-            - "--log.level=INFO"
-            - "--providers.kubernetescrd=true"
-            - "--providers.kubernetescrd.allowexternalnameservices=true"
-            - "--providers.kubernetescrd.allowemptyservices=true"
-            - "--providers.kubernetesingress=true"
-            - "--providers.kubernetesingress.allowemptyservices=true"
-            - "--providers.kubernetesingress.allowexternalnameservices=true"
-            - "--providers.kubernetesingress.ingressclass=traefik"
-            - "--providers.kubernetesingress.ingressendpoint.publishedservice=infrastructure/traefik"
-            # - "--experimental.kubernetesgateway=true"
-            # - "--providers.kubernetesgateway=true"
+      - image: docker.io/traefik:v3.4.1
+        imagePullPolicy: IfNotPresent
+        name: traefik
+        resources:
+        readinessProbe:
+          httpGet:
+            path: /ping
+            port: 8080
+            scheme: HTTP
+          failureThreshold: 1
+          initialDelaySeconds: 2
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 2
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: 8080
+            scheme: HTTP
+          failureThreshold: 3
+          initialDelaySeconds: 2
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 2
+        lifecycle:
+        ports:
+        - name: metrics
+          containerPort: 9100
+          protocol: TCP
+        - name: traefik
+          containerPort: 8080
+          protocol: TCP
+        - name: web
+          containerPort: 8000
+          protocol: TCP
+        - name: websecure
+          containerPort: 8443
+          protocol: TCP
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        volumeMounts:
+          - name: data
+            mountPath: /data
+          - name: tmp
+            mountPath: /tmp
+        args:
+          - "--api.dashboard=true"
+          - "--api.insecure=true"
+          - "--entryPoints.metrics.address=:9100/tcp"
+          - "--entrypoints.tcpep.address=:6000/tcp"
+          - "--entryPoints.traefik.address=:8080/tcp"
+          - "--entrypoints.udpep.address=:7000/udp"
+          - "--entryPoints.web.address=:8000/tcp"
+          - "--entryPoints.web.forwardedHeaders.insecure"
+          - "--entryPoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/16"
+          - "--entryPoints.web.proxyProtocol.insecure"
+          - "--entryPoints.web.proxyProtocol.trustedIPs=127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/16"
+          - "--entryPoints.websecure.address=:8443/tcp"
+          - "--entryPoints.websecure.http.tls=true"
+          - "--experimental.fastProxy"
+          - "--global.checkNewVersion"
+          - "--log.level=INFO"
+          - "--metrics.prometheus.entrypoint=metrics"
+          - "--metrics.prometheus=true"
+          - "--ping=true"
+          - "--providers.kubernetescrd.allowCrossNamespace=true"
+          - "--providers.kubernetescrd.allowEmptyServices=true"
+          - "--providers.kubernetescrd.allowExternalNameServices=true"
+          - "--providers.kubernetescrd.ingressClass=traefik"
+          - "--providers.kubernetescrd"
+          - "--providers.kubernetesgateway.statusaddress.service.name=traefik"
+          - "--providers.kubernetesgateway.statusaddress.service.namespace=infrastructure"
+          - "--providers.kubernetesgateway"
+          - "--providers.kubernetesingress.allowEmptyServices=true"
+          - "--providers.kubernetesingress.allowExternalNameServices=true"
+          - "--providers.kubernetesingress.ingressClass=traefik"
+          - "--providers.kubernetesingress.ingressendpoint.publishedservice=infrastructure/traefik"
+          - "--providers.kubernetesingress"
+          - "--tracing.addinternals"
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
       volumes:
         - name: data
           emptyDir: {}
         - name: tmp
           emptyDir: {}
       securityContext:
-        fsGroup: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65532
 ---
 # Source: traefik/templates/hpa.yaml
 apiVersion: autoscaling/v2
@@ -251,7 +369,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: traefik
-  minReplicas: 2
+  minReplicas: 1
   maxReplicas: 15
   metrics:
     - type: Resource
@@ -267,65 +385,42 @@ spec:
           type: AverageValue
           averageValue: 200Mi
 ---
-# Source: traefik/templates/service.yaml
-apiVersion: v1
-kind: List
-items:
-  - apiVersion: v1
-    kind: Service
-    metadata:
-      name: traefik
-      namespace: infrastructure
-      labels:
-        app.kubernetes.io/name: traefik
-        app.kubernetes.io/instance: traefik
-      annotations:
-    spec:
-      type: LoadBalancer
-      selector:
-        app.kubernetes.io/name: traefik
-        app.kubernetes.io/instance: traefik
-      ports:
-        - port: 80
-          name: web
-          targetPort: "web"
-          protocol: "TCP"
-          nodePort: 30080
-        - port: 443
-          name: websecure
-          targetPort: "websecure"
-          protocol: "TCP"
-          nodePort: 30443
-        - port: 7000
-          name: udpep
-          targetPort: "udpep"
-          protocol: "UDP"
-          nodePort: 32700
-        - port: 6000
-          name: tcpep
-          targetPort: "tcpep"
-          protocol: "TCP"
-          nodePort: 32600
-  - apiVersion: v1
-    kind: Service
-    metadata:
-      name: traefik-internal
-      namespace: infrastructure
-      labels:
-        app.kubernetes.io/name: traefik
-        app.kubernetes.io/instance: traefik
-        app.kubernetes.io/usage: metrics
-    spec:
-      type: ClusterIP
-      selector:
-        app.kubernetes.io/name: traefik
-        app.kubernetes.io/instance: traefik
-      ports:
-        - port: 9000
-          name: traefik
-          targetPort: "traefik"
-          protocol: "TCP"
-        - port: 8082
-          name: metrics
-          targetPort: "metrics"
-          protocol: "TCP"
+# Source: traefik/templates/ingressclass.yaml
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-infrastructure
+  name: traefik
+spec:
+  controller: traefik.io/ingress-controller
+---
+# Source: traefik/templates/gateway.yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: traefik
+  namespace: infrastructure
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-infrastructure
+spec:
+  gatewayClassName: traefik
+  listeners:
+    - name: web
+      port: 8000
+      protocol: HTTP
+---
+# Source: traefik/templates/gatewayclass.yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: traefik
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-infrastructure
+spec:
+  controllerName: traefik.io/gateway-controller
