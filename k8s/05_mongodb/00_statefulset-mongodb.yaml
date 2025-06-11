@@ -41,7 +41,7 @@ spec:
       terminationGracePeriodSeconds: 10
       containers:
         - name: mongodb
-          image: mongo:4.4.19
+          image: mongo:8.0.6
           command:
             - mongod
             - "--replSet"

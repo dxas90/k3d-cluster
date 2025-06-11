@@ -3,8 +3,9 @@ kind: LabelTransformer
 metadata:
   name: labels
 labels:
-  app.kubernetes.io/reviewapp.name: app
-  app.kubernetes.io/reviewapp.version: v0.0.1
+  app: gitops-k8s
+  app.kubernetes.io/owner.team: devops
+  app.kubernetes.io/generated: "true"
 fieldSpecs:
   - path: metadata/labels
     create: true

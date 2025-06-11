@@ -38,7 +38,7 @@ tasks:
       - k3d cluster delete ${CLUSTER_NAME}
       - cmd: docker network rm k3d-${CLUSTER_NAME} > /dev/null 2>&1
         silent: true
- 
+
   install:flux:
     desc: Install Flux into your cluster
     aliases: [flux]

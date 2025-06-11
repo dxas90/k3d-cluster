@@ -1,6 +1,7 @@
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/k3d-io/k3d/main/pkg/config/v1alpha5/schema.json
 # https://k3d.io/usage/configfile/
+# curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server --disable=traefik,servicelb,local-storage,metrics-server --kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1% --kube-proxy-arg=conntrack-max-per-core=0" K3S_TOKEN=$CLUSTER_SECRET K3S_KUBECONFIG_MODE=644 sh -s -
 apiVersion: k3d.io/v1alpha5
 kind: Simple
 metadata:
@@ -88,4 +89,3 @@ env:
   - envVar: K3S_RESOLV_CONFIG=1.1.1.1
     nodeFilters:
       - all
-

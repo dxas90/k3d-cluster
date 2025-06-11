@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base-full-common-resources
+  - extra-info.yaml
+
+namePrefix: preview-${GIT_TAG}-
+
+patches:
+  - target:
+      kind: Ingress
+      name: exampleapp-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: ${PREVIEW_URL}
+images:
+  - name: ${IMAGE}
+    newTag: ${IMAGE_TAG}
+
+transformers:
+  - labels.yaml
+
+labels:
+- includeSelectors: true
+  pairs:
+    app: gitops-k8s
+    app.kubernetes.io/owner.team: devops
+    app.kubernetes.io/generated: "true"
+    app.kubernetes.io/preview-app.repo: "${REPOSITORY}"
+    app.kubernetes.io/preview-app.branch: "${REPOSITORY_BRANCH}"

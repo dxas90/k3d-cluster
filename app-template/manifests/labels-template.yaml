@@ -1,0 +1,15 @@
+apiVersion: builtin
+kind: LabelTransformer
+metadata:
+  name: labels
+labels:
+  app.kubernetes.io/preview-app.version: ${APP_VERSION}
+  app.kubernetes.io/preview-app.url: ${PREVIEW_URL}
+  app.kubernetes.io/preview-app.preview: "true"
+  app.kubernetes.io/preview-app.expiration: "${EXPIRATION}"
+  app.kubernetes.io/preview-app.pr-number: "${PR_NUMBER}"
+  app.kubernetes.io/preview-app.repo: "${REPOSITORY}"
+  app.kubernetes.io/preview-app.branch: "${REPOSITORY_BRANCH}"
+fieldSpecs:
+  - path: metadata/labels
+    create: true
