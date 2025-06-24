@@ -1,6 +1,6 @@
 ---
-kind: Namespace
 apiVersion: v1
+kind: Namespace
 metadata:
   name: infrastructure
   labels:
@@ -20,10 +20,13 @@ metadata:
 data:
   update-node.sh: |
     #!/bin/sh
+    set -eu
     REDIS_NODES="/data/nodes.conf"
-    sed -i -e "/myself/ s/[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/${POD_IP}/" ${REDIS_NODES}
+    if [ -f "${REDIS_NODES}" ]; then
+      sed -i -e "/myself/ s/[0-9]\{1,3\}\(\.[0-9]\{1,3\}\)\{3\}/${POD_IP}/" "${REDIS_NODES}"
+    fi
     exec "$@"
-  redis.conf: |+
+  redis.conf: |
     cluster-enabled yes
     cluster-require-full-coverage no
     cluster-node-timeout 15000
@@ -51,50 +54,60 @@ spec:
       labels:
         app: redis-cluster
     spec:
+      terminationGracePeriodSeconds: 30
       containers:
-      - name: redis
-        image: redis:7.0.10-alpine
-        ports:
-        - containerPort: 6379
-          name: client
-        - containerPort: 16379
-          name: gossip
-        command: ["/conf/update-node.sh", "redis-server", "/conf/redis.conf"]
-        env:
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        - name: POD_IP
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: status.podIP
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.name
-        volumeMounts:
-        - name: conf
-          mountPath: /conf
-          readOnly: false
-        - name: data
-          mountPath: /data
-          readOnly: false
+        - name: redis
+          image: redis:8.2-m01-alpine
+          ports:
+            - containerPort: 6379
+              name: client
+            - containerPort: 16379
+              name: gossip
+          command: ["/conf/update-node.sh", "redis-server", "/conf/redis.conf"]
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          volumeMounts:
+            - name: conf
+              mountPath: /conf
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
       volumes:
-      - name: conf
-        configMap:
-          name: redis-cluster
-          defaultMode: 0755
+        - name: conf
+          configMap:
+            name: redis-cluster
+            defaultMode: 0755
   volumeClaimTemplates:
-  - metadata:
-      name: data
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      resources:
-        requests:
-          storage: 512M
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 512Mi
 ---
 apiVersion: v1
 kind: Service
@@ -107,11 +120,51 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-  - port: 6379
-    targetPort: 6379
-    name: client
-  - port: 16379
-    targetPort: 16379
-    name: gossip
+    - port: 6379
+      targetPort: 6379
+      name: client
+    - port: 16379
+      targetPort: 16379
+      name: gossip
   selector:
     app: redis-cluster
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: redis-cluster-init
+  namespace: infrastructure
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: redis-cluster-init
+        image: redis:8.2-m01-alpine
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for 6 Redis pods to become ready..."
+          for i in $(seq 1 30); do
+            READY=$(getent hosts redis-cluster-0.redis-cluster.infrastructure.svc.cluster.local && \
+                    getent hosts redis-cluster-5.redis-cluster.infrastructure.svc.cluster.local && echo ready || echo notready)
+            if [ "$READY" = "ready" ]; then break; fi
+            echo "Not ready yet, sleeping..."; sleep 5;
+          done
+
+          echo "Checking if cluster is already created..."
+          if redis-cli -h redis-cluster-0.redis-cluster.infrastructure.svc.cluster.local cluster info | grep -q "cluster_state:ok"; then
+            echo "Redis cluster already initialized. Skipping."
+            exit 0
+          fi
+
+          echo "Creating Redis cluster..."
+          redis-cli --cluster create --cluster-yes --cluster-replicas 1 \
+            $(getent hosts redis-cluster-0.redis-cluster.infrastructure.svc.cluster.local | awk '{print $1 ":6379"}') \
+            $(getent hosts redis-cluster-1.redis-cluster.infrastructure.svc.cluster.local | awk '{print $1 ":6379"}') \
+            $(getent hosts redis-cluster-2.redis-cluster.infrastructure.svc.cluster.local | awk '{print $1 ":6379"}') \
+            $(getent hosts redis-cluster-3.redis-cluster.infrastructure.svc.cluster.local | awk '{print $1 ":6379"}') \
+            $(getent hosts redis-cluster-4.redis-cluster.infrastructure.svc.cluster.local | awk '{print $1 ":6379"}') \
+            $(getent hosts redis-cluster-5.redis-cluster.infrastructure.svc.cluster.local | awk '{print $1 ":6379"}')

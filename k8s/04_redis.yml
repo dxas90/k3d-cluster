@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: redis
-        image: redis:7.0.10-alpine
+        image: redis:8.2-m01-alpine
         ports:
         - containerPort: 6379
           name: client

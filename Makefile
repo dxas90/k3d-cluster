@@ -139,11 +139,7 @@ install/redis-cluster: install/storage
 	$(call assert-set,KUBECTL)
 	@echo -e "\033[1;32mInstalling redis (you might have to run this twice)\033[0;39m"
 	@$(KUBECTL) -n infrastructure apply -f k8s/04_full-redis-cluster.yml
-	@$(KUBECTL) -n infrastructure wait --for=jsonpath='{.status.availableReplicas}'=6 --timeout=120s statefulset.apps/redis-cluster
-	@echo -e "\033[1;32mChecking redis (you might have to run this twice)\033[0;39m"
-	@echo -e "\033[1;33mError 99 is that Redis cluster is up and running\033[0;39m"
-	@test "$(shell kubectl -n infrastructure exec -it redis-cluster-0 --container redis -- redis-cli cluster info|grep cluster_state:|cut -d ":" -f 2 |tr -d "\r")" = "ok" &&  exit 99 || exit 0
-	@echo "yes" | $(KUBECTL) -n infrastructure exec -it redis-cluster-0 -- redis-cli --cluster create --cluster-replicas 1 $(shell kubectl -n infrastructure get pods -l app=redis-cluster -o jsonpath='{range.items[*]}{.status.podIP}:6379 {end}')
+	@$(KUBECTL) -n infrastructure wait --for=jsonpath='{.status.availableReplicas}'=6 --timeout=150s statefulset.apps/redis-cluster
 
 install/postgres: install/storage
 	$(call assert-set,KUBECTL)
