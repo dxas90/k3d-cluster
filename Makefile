@@ -141,6 +141,12 @@ install/redis-cluster: install/storage
 	@$(KUBECTL) -n infrastructure apply -f k8s/04_full-redis-cluster.yml
 	@$(KUBECTL) -n infrastructure wait --for=jsonpath='{.status.availableReplicas}'=6 --timeout=150s statefulset.apps/redis-cluster
 
+install/valkey-cluster: install/storage
+	$(call assert-set,KUBECTL)
+	@echo -e "\033[1;32mInstalling valkey\033[0;39m"
+	@$(KUBECTL) -n infrastructure apply -f k8s/04_full-valkey-cluster.yml
+	@$(KUBECTL) -n infrastructure wait --for=jsonpath='{.status.availableReplicas}'=6 --timeout=150s statefulset.apps/valkey-cluster
+
 install/postgres: install/storage
 	$(call assert-set,KUBECTL)
 	@echo -e "\033[1;32mInstalling postgres\033[0;39m"
