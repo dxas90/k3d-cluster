@@ -51,8 +51,7 @@ spec:
               containerPort: 5000 # line 11
               protocol: TCP
           resources:
-            limits:
-              cpu: 10m
+            limits: # https://home.robusta.dev/blog/stop-using-cpu-limits
               memory: 56Mi
             requests:
               cpu: 10m
