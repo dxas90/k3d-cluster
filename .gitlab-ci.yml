@@ -8,7 +8,7 @@ default:
     - name: bitnami/kubectl:latest
       entrypoint: ['']
       command: ['bash']
-    - name: rancher/k3s:v1.33.1-k3s1
+    - name: rancher/k3s:v1.33.2-k3s1
       alias: k3s
       command:
         - "server"
