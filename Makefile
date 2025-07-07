@@ -43,6 +43,7 @@ create/cluster:
 	@$(MKDIR) -p ${SHARED_PATH}/default-local-pv
 	@$(ENVSUBST) < k3d-config.yaml | cat > /tmp/k3d-config.yaml
 	@$(K3D) cluster list --no-headers | grep ${CLUSTER_NAME} > /dev/null 2>&1 || $(K3D) cluster create -c /tmp/k3d-config.yaml
+	@$(KUBECTL) create ns infrastructure > /dev/null 2>&1 || true
 
 delete/cluster:
 	$(call assert-set,CLUSTER_NAME)
@@ -129,6 +130,12 @@ install/cockroach: install/storage
 	@$(KUBECTL) -n cockroach-operator-system apply -f https://raw.githubusercontent.com/cockroachdb/cockroach-operator/v2.10.0/install/operator.yaml
 	@$(KUBECTL) -n cockroach-operator-system wait --for condition=available --timeout=90s deploy -lapp=cockroach-operator ; $(shell sleep 5)
 	@$(KUBECTL) -n infrastructure apply -f k8s/99_cockroach.yaml
+
+install/rabbitmq: install/storage
+	$(call assert-set,KUBECTL)
+	@echo -e "\\033[1;32mInstalling rabbitmq\\033[0;39m"
+	@$(KUBECTL) apply -f https://github.com/rabbitmq/cluster-operator/releases/latest/download/cluster-operator.yml
+	@$(KUBECTL) -n infrastructure apply -f k8s/08_rabbitmq/rabbitmq.yaml
 
 install/redis: install/storage
 	$(call assert-set,KUBECTL)

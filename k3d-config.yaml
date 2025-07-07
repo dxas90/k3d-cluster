@@ -27,10 +27,10 @@ ports:
   # - port: ${CURRENT_IP}:32600-32767:32600-32767 # a range of k3s nodeports exposed on host https://docs.k3s.io/cli/server#networking
   #   nodeFilters:
   #   - loadbalancer
-  - port: 0.0.0.0:1080:30080
+  - port: 0.0.0.0:3080:30080
     nodeFilters:
       - loadbalancer
-  - port: 0.0.0.0:1443:30443
+  - port: 0.0.0.0:3443:30443
     nodeFilters:
       - loadbalancer
 options:

@@ -1,0 +1,68 @@
+---
+# based on https://github.com/rabbitmq/cluster-operator/blob/main/docs/examples/production-ready/rabbitmq.yaml
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: rabbitmq-production
+spec:
+  replicas: 3
+  rabbitmq:
+    additionalPlugins:
+      - rabbitmq_federation
+      - rabbitmq_federation_management
+      - rabbitmq_mqtt
+      - rabbitmq_stomp
+      - rabbitmq_stream
+      - rabbitmq_web_mqtt
+      - rabbitmq_web_stomp
+    # More log configuration options can be found in https://github.com/rabbitmq/rabbitmq-server/pull/2927
+    additionalConfig: |
+      cluster_partition_handling = pause_minority
+      disk_free_limit.relative = 1.0
+      collect_statistics_interval = 10000
+      queue_leader_locator = balanced
+      log.console = true
+      log.console.formatter = json
+      log.console.formatter.json.field_map = verbosity:v time msg domain file line pid level:-
+      log.console.formatter.json.verbosity_map = debug:7 info:6 notice:5 warning:4 error:3 critical:2 alert:1 emergency:0
+      log.console.formatter.time_format = epoch_usecs
+    # Disable RABBITMQ_LOGS=- which is set in
+    # https://github.com/docker-library/rabbitmq/blob/ece63d4534cc44abd6b1ec35bbd9aa0d21e87e1d/3.9/ubuntu/Dockerfile#L211
+    # Otherwise, this environment variable will override all log configurations in additionalConfig.
+    envConfig: |
+      RABBITMQ_LOGS=""
+  persistence:
+    # storageClassName: ssd
+    storage: "500Gi"
+  resources:
+    requests:
+      cpu: 2
+      memory: 8Gi
+    limits:
+      memory: 8Gi
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                - rabbitmq-production
+          topologyKey: kubernetes.io/hostname
+  override:
+    statefulSet:
+      spec:
+        template:
+          spec:
+            containers: []
+            topologySpreadConstraints:
+            - maxSkew: 1
+              topologyKey: "topology.kubernetes.io/zone"
+              whenUnsatisfiable: DoNotSchedule
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: rabbitmq-production
+
