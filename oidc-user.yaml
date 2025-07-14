@@ -10,4 +10,4 @@ subjects:
 -
   apiGroup: rbac.authorization.k8s.io
   kind: User
-  name: k3s-oidc-ff77f829-4e0d-44f4-8020-e55572b88d98
+  name: k3s-oidc-${OIDC_TOKEN_SUB}
