@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: oidc-admin
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+-
+  apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: k3s-oidc-ff77f829-4e0d-44f4-8020-e55572b88d98

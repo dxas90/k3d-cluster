@@ -67,6 +67,21 @@ options:
         nodeFilters:
           - agent:*
           - server:*
+      - arg: "--kube-apiserver-arg=oidc-issuer-url=https://id.5rv.me"
+        nodeFilters:
+          - server:*
+      - arg: "--kube-apiserver-arg=oidc-client-id=6c2cc681-161f-4af2-ba2f-ec5091f7eec4"
+        nodeFilters:
+          - server:*
+      - arg: "--kube-apiserver-arg=oidc-username-claim=sub"
+        nodeFilters:
+          - server:*
+      - arg: "--kube-apiserver-arg=oidc-username-prefix=k3s-oidc-"
+        nodeFilters:
+          - server:*
+      - arg: "--kube-apiserver-arg=oidc-groups-claim=groups"
+        nodeFilters:
+          - server:*
     nodeLabels:
       - label: nerdctl/bypass4netns=true
         nodeFilters:

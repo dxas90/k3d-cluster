@@ -55,6 +55,14 @@ reset: delete/cluster \
 	@echo -e "\\033[1;32mCleanning cluster ${CLUSTER_NAME} events\\033[0;39m"
 	@$(KUBECTL) delete events --all --all-namespaces
 
+create/oidc-cluster: create/cluster
+	$(call assert-set,CLUSTER_NAME)
+	@echo -e "\\033[1;32mSetup OIDC cluster ${CLUSTER_NAME}\\033[0;39m"
+	@$(KUBECTL) oidc-login setup --oidc-issuer-url=https://id.5rv.me --oidc-client-id=6c2cc681-161f-4af2-ba2f-ec5091f7eec4 --oidc-pkce-method=S256 --grant-type=authcode
+	@$(eval export OIDC_TOKEN_SUB := $(shell $(KUBECTL) oidc-login get-token --oidc-issuer-url=https://id.5rv.me --oidc-client-id=6c2cc681-161f-4af2-ba2f-ec5091f7eec4 --oidc-pkce-method=S256 --grant-type=authcode | jq -r .status.token | cut -d '.' -f2 | base64 -d | jq .sub | tr -d '"'))
+	$(ENVSUBST) < oidc-user.yaml | $(KUBECTL) apply -f -
+	@$(KUBECTL) config set-context --current --user=oidc
+
 install/certmanager: create/cluster
 	$(call assert-set,KUBECTL)
 	@echo -e "\\033[1;32mInstalling cert-manager\\033[0;39m"
