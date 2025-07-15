@@ -76,10 +76,13 @@ options:
       - arg: "--kube-apiserver-arg=oidc-username-claim=sub"
         nodeFilters:
           - server:*
-      - arg: "--kube-apiserver-arg=oidc-username-prefix=k3s-oidc-"
+      - arg: "--kube-apiserver-arg=oidc-username-prefix=idp:"
         nodeFilters:
           - server:*
       - arg: "--kube-apiserver-arg=oidc-groups-claim=groups"
+        nodeFilters:
+          - server:*
+      - arg: "--kube-apiserver-arg=oidc-groups-prefix=idp-groups:"
         nodeFilters:
           - server:*
     nodeLabels:
