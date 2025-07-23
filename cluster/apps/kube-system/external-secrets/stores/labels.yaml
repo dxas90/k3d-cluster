@@ -1,0 +1,9 @@
+apiVersion: builtin
+kind: LabelTransformer
+metadata:
+  name: labels
+labels:
+  home.system.app/part: external-secrets-stores
+fieldSpecs:
+  - path: metadata/labels
+    create: true

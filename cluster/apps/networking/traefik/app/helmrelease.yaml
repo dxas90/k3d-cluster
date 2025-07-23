@@ -1,0 +1,240 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: traefik
+  namespace: networking
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: traefik
+      version: 24.0.0
+      sourceRef:
+        kind: HelmRepository
+        name: traefik-charts
+        namespace: flux-system
+  maxHistory: 2
+  install:
+    createNamespace: true
+    disableWait: false
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    disableWait: false
+    remediation:
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values: # https://github.com/traefik/traefik-helm-chart/blob/master/traefik/values.yaml
+    tag: "v2.10.4"
+    deployment:
+      replicas: 2
+    podDisruptionBudget:
+      enabled: true
+      maxUnavailable: 1
+    rbac:
+      enabled: true
+      namespaced: false
+    namespaceOverride: networking
+    ingressClass:
+      enabled: true
+      isDefaultClass: false
+    providers:
+      kubernetesCRD:
+        # -- Load Kubernetes IngressRoute provider
+        enabled: true
+        # -- Allows IngressRoute to reference resources in namespace other than theirs
+        allowCrossNamespace: true
+        # -- Allows to reference ExternalName services in IngressRoute
+        allowExternalNameServices: true
+        # -- Allows to return 503 when there is no endpoints available
+        allowEmptyServices: true
+        ingressClass: traefik
+      kubernetesIngress:
+        # -- Load Kubernetes IngressRoute provider
+        enabled: true
+        # -- Allows to reference ExternalName services in Ingress
+        allowExternalNameServices: true
+        # -- Allows to return 503 when there is no endpoints available
+        allowEmptyServices: true
+        ingressClass: traefik
+        publishedService:
+          enabled: true
+    env:
+      - name: POD_NAMESPACE
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+      - name: POD_IP
+        valueFrom:
+          fieldRef:
+            apiVersion: v1
+            fieldPath: status.hostIP
+      - name: POD_NAME
+        valueFrom:
+          fieldRef:
+            apiVersion: v1
+            fieldPath: metadata.name
+    additionalArguments:
+      - "--metrics.prometheus=true"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--ping=true"
+      - "--log.level=INFO"
+      - "--providers.kubernetesingress.ingressendpoint.publishedservice=networking/traefik"
+      - "--entrypoints.udpep.address=:7000/udp"
+      - "--entrypoints.tcpep.address=:6000/tcp"
+    globalArguments:
+      - "--global.checknewversion"
+      - "--global.sendanonymoususage=false"
+    experimental:
+      kubernetesGateway:
+        # -- Enable traefik experimental GatewayClass CRD
+        enabled: false
+        gateway:
+          # -- Enable traefik regular kubernetes gateway
+          enabled: true
+      plugins:
+        # -- Enable traefik experimental plugins
+        enabled: true
+    ports:
+      traefik:
+        port: 9000
+        expose: false
+        exposedPort: 9000
+      web:
+        ## -- Enable this entrypoint as a default entrypoint. When a service doesn't explicitly set an entrypoint it will only use this entrypoint.
+        # asDefault: true
+        port: 8000
+        # hostPort: 8000
+        # containerPort: 8000
+        expose: true
+        exposedPort: 80
+        nodePort: 30080
+        ## -- Different target traefik port on the cluster, useful for IP type LB
+        # targetPort: 80
+        # The port protocol (TCP/UDP)
+        protocol: TCP
+        # redirectTo: websecure
+        #
+        # Trust forwarded  headers information (X-Forwarded-*).
+        forwardedHeaders:
+          trustedIPs:
+            - 127.0.0.1/32
+            - 10.0.0.0/8
+            - 192.168.0.0/16
+            - 172.16.0.0/16
+            - ${CURRENT_EXTERNAL_IP}
+          insecure: true
+        #
+        # Enable the Proxy Protocol header parsing for the entry point
+        proxyProtocol:
+          trustedIPs:
+            - 127.0.0.1/32
+            - 10.0.0.0/8
+            - 192.168.0.0/16
+            - 172.16.0.0/16
+            - ${CURRENT_EXTERNAL_IP}
+          insecure: true
+      websecure:
+        ## -- Enable this entrypoint as a default entrypoint. When a service doesn't explicitly set an entrypoint it will only use this entrypoint.
+        # asDefault: true
+        port: 8443
+        # hostPort: 8443
+        # containerPort: 8443
+        expose: true
+        exposedPort: 443
+        ## -- Different target traefik port on the cluster, useful for IP type LB
+        # targetPort: 80
+        ## -- The port protocol (TCP/UDP)
+        protocol: TCP
+        nodePort: 30443
+
+        # advertisedPort: 4443
+        #
+        ## -- Trust forwarded  headers information (X-Forwarded-*).
+        forwardedHeaders:
+          trustedIPs:
+            - 127.0.0.1/32
+            - 10.0.0.0/8
+            - 192.168.0.0/16
+            - 172.16.0.0/16
+            - ${CURRENT_EXTERNAL_IP}
+          insecure: false
+        proxyProtocol:
+          trustedIPs:
+            - 127.0.0.1/32
+            - 10.0.0.0/8
+            - 192.168.0.0/16
+            - 172.16.0.0/16
+            - ${CURRENT_EXTERNAL_IP}
+          insecure: false
+        #
+        ## Set TLS at the entrypoint
+        ## https://doc.traefik.io/traefik/routing/entrypoints/#tls
+        tls:
+          enabled: true
+      udpep:
+        port: 7000
+        expose: true
+        exposedPort: 7000
+        # nodePort: 32700
+        protocol: UDP
+      tcpep:
+        port: 6000
+        expose: true
+        exposedPort: 6000
+        # nodePort: 32600
+        protocol: TCP
+    # 30000-32767 is the default NodePort range
+    # tlsStore:
+    #   default:
+    #     defaultCertificate:
+    #       secretName: 127-0-0-2-nip-io-staging-tls
+    service:
+      enabled: true
+      single: true
+      type: LoadBalancer
+      # -- Additional annotations applied to both TCP and UDP services (e.g. for cloud provider specific config)
+      annotations: {}
+      labels: {}
+      # -- Additional entries here will be added to the service spec.
+      # -- Cannot contain type, selector or ports entries.
+      spec:
+        externalTrafficPolicy: Cluster
+      ## -- Class of the load balancer implementation https://kube-vip.io/docs/usage/kubernetes-services/#external-traffic-policy-kube-vip-v050
+      # loadBalancerClass: kube-vip.io/kube-vip-class
+    autoscaling:
+      # -- Create HorizontalPodAutoscaler object.
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 15
+      metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 60
+        - type: Resource
+          resource:
+            name: memory
+            target:
+              type: Utilization
+              averageUtilization: 60
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+            - type: Pods
+              value: 1
+              periodSeconds: 60
+    resources:
+      limits:
+        cpu: 300m
+        memory: 300Mi
+      requests:
+        cpu: 100m
+        memory: 200Mi

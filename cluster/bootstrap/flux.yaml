@@ -26,9 +26,6 @@ spec:
     multitenant: false
     networkPolicy: true
     domain: "cluster.local"
-  storage:
-    class: "standard"
-    size: "10Gi"
   kustomize: # https://github.com/dxas90/k3d-cluster/blob/master/kubernetes/flux/config/flux.yaml
     patches:
       # Remove the network policies that does not work with k3s
@@ -106,5 +103,7 @@ spec:
   sync:
     kind: GitRepository
     url: "https://github.com/dxas90/k3d-cluster.git"
-    ref: "refs/heads/master"
+    ref: "refs/heads/new-cluster"
     path: cluster
+    name: common-kubernetes
+    interval: 5m

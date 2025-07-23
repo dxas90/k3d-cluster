@@ -1,0 +1,14 @@
+---
+apiVersion: externaldns.k8s.io/v1alpha1
+kind: DNSEndpoint
+metadata:
+  name: pihole-internal
+  namespace: networking
+  annotations:
+    external-dns.alpha.kubernetes.io/local-target: ${CURRENT_IP}
+spec:
+  endpoints:
+    - dnsName: "internal.127.0.0.2.nip.io"
+      recordType: A
+      targets:
+        - ${CURRENT_IP}

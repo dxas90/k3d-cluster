@@ -1,0 +1,37 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cluster-apps-cloudnative-pg
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: cluster-apps-external-secrets
+  path: ./cluster/apps/database/cloudnative-pg/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: common-kubernetes
+  wait: true
+  interval: 30m
+  retryInterval: 1m
+  timeout: 3m
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cluster-apps-cloudnative-pg-cluster
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: cluster-apps-cloudnative-pg
+    - name: cluster-apps-external-secrets
+  path: ./cluster/apps/database/cloudnative-pg/cluster
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: common-kubernetes
+  wait: true
+  interval: 30m
+  retryInterval: 1m
+  timeout: 3m
