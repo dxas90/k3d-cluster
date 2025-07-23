@@ -1,0 +1,9 @@
+---
+apiVersion: traefik.io/v1alpha1
+kind: TLSStore
+metadata:
+  name: default
+  namespace: networking
+spec:
+  defaultCertificate:
+    secretName: 127-0-0-2-nip-io-staging-tls

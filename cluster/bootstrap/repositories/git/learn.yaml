@@ -1,0 +1,16 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: learn
+  namespace: flux-system
+spec:
+  interval: 5m
+  ref:
+    branch: develop
+  url: "https://github.com/dxas90/learn.git"
+  ignore: |
+    # exclude all
+    /*
+    # include kubernetes directory
+    !/k8s

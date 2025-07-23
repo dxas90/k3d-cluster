@@ -1,0 +1,16 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cluster-apps-node-feature-discovery
+  namespace: flux-system
+  labels:
+    substitution.flux.home.arpa/enabled: "true"
+spec:
+  interval: 10m
+  path: ./kubernetes/cluster-common/apps/kube-tools/node-feature-discovery/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: common-kubernetes
+  wait: true

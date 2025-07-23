@@ -1,0 +1,20 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: "127-0-0-2-nip-io-staging"
+  namespace: networking
+  labels:
+    use-cloudflare-solver: "true"
+spec:
+  secretName: "127-0-0-2-nip-io-staging-tls"
+  secretTemplate:
+    labels:
+      use-cloudflare-solver: "true"
+  issuerRef:
+    name: letsencrypt-staging
+    kind: ClusterIssuer
+  commonName: "127.0.0.2.nip.io"
+  dnsNames:
+    - "127.0.0.2.nip.io"
+    - "*.127.0.0.2.nip.io"

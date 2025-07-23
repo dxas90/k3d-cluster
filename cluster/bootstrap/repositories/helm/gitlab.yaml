@@ -1,0 +1,14 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: gitlab
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: agentk
+    app.kubernetes.io/created-by: gitlab
+    app.kubernetes.io/name: agentk
+    app.kubernetes.io/part-of: gitlab
+spec:
+  interval: 30m
+  url: https://charts.gitlab.io

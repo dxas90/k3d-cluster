@@ -1,0 +1,18 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cluster-apps-external-secrets
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: cluster-apps-kube-prometheus-stack
+  path: ./cluster/apps/external-secrets/external-secrets/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: common-kubernetes
+  wait: true
+  interval: 30m
+  retryInterval: 1m
+  timeout: 5m

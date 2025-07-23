@@ -1,0 +1,39 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgres
+  namespace: database
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgis:14
+  primaryUpdateStrategy: unsupervised
+  bootstrap:
+    initdb:
+      postInitTemplateSQL:
+        - CREATE EXTENSION postgis;
+        - CREATE EXTENSION postgis_topology;
+        - CREATE EXTENSION fuzzystrmatch;
+        - CREATE EXTENSION postgis_tiger_geocoder;
+  storage:
+    size: 1Gi
+    storageClass: local-path
+    pvcTemplate:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: local-path
+      volumeMode: Filesystem
+
+  superuserSecret:
+    name: cloudnative-pg-secret
+  enableSuperuserAccess: true
+  postgresql:
+    parameters:
+      timezone: ${TIMEZONE}
+      max_connections: "600"
+      shared_buffers: 512MB
+  monitoring:
+    enablePodMonitor: true
