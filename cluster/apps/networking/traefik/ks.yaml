@@ -14,42 +14,42 @@ spec:
   interval: 30m
   retryInterval: 1m
   timeout: 5m
----
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: cluster-apps-traefik-certificates
-  namespace: flux-system
-spec:
-  dependsOn:
-    - name: cluster-apps-external-dns
-    - name: cluster-apps-cert-manager
-    - name: cluster-apps-cert-manager-issuers
-  path: ./cluster/apps/networking/traefik/certificates
-  prune: true
-  sourceRef:
-    kind: GitRepository
-    name: common-kubernetes
-  wait: true
-  interval: 30m
-  retryInterval: 1m
-  timeout: 5m
----
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: cluster-apps-traefik-extras
-  namespace: flux-system
-spec:
-  dependsOn:
-    - name: cluster-apps-traefik
-    - name: cluster-apps-traefik-certificates
-  path: ./cluster/apps/networking/traefik/extras
-  prune: true
-  sourceRef:
-    kind: GitRepository
-    name: common-kubernetes
-  wait: true
-  interval: 30m
-  retryInterval: 1m
-  timeout: 5m
+# ---
+# apiVersion: kustomize.toolkit.fluxcd.io/v1
+# kind: Kustomization
+# metadata:
+#   name: cluster-apps-traefik-certificates
+#   namespace: flux-system
+# spec:
+#   dependsOn:
+#     - name: cluster-apps-external-dns
+#     - name: cluster-apps-cert-manager
+#     - name: cluster-apps-cert-manager-issuers
+#   path: ./cluster/apps/networking/traefik/certificates
+#   prune: true
+#   sourceRef:
+#     kind: GitRepository
+#     name: common-kubernetes
+#   wait: true
+#   interval: 30m
+#   retryInterval: 1m
+#   timeout: 5m
+# ---
+# apiVersion: kustomize.toolkit.fluxcd.io/v1
+# kind: Kustomization
+# metadata:
+#   name: cluster-apps-traefik-extras
+#   namespace: flux-system
+# spec:
+#   dependsOn:
+#     - name: cluster-apps-traefik
+#     - name: cluster-apps-traefik-certificates
+#   path: ./cluster/apps/networking/traefik/extras
+#   prune: true
+#   sourceRef:
+#     kind: GitRepository
+#     name: common-kubernetes
+#   wait: true
+#   interval: 30m
+#   retryInterval: 1m
+#   timeout: 5m
