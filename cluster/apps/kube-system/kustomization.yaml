@@ -5,4 +5,3 @@ resources:
   - ./namespace.yaml
   - ./reloader/ks.yaml
   - ./metrics-server/ks.yaml
-  - ./external-secrets/ks.yaml
