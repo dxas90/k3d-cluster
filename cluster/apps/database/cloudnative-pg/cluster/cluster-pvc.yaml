@@ -23,7 +23,6 @@ metadata:
     type: local
     app.kubernetes.io/name: database
 spec:
-  storageClassName: standard
   capacity:
     storage: 2Gi
   accessModes:
