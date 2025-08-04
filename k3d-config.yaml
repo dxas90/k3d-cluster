@@ -70,7 +70,7 @@ options:
       - arg: "--kube-apiserver-arg=oidc-issuer-url=https://id.5rv.me"
         nodeFilters:
           - server:*
-      - arg: "--kube-apiserver-arg=oidc-client-id=6c2cc681-161f-4af2-ba2f-ec5091f7eec4"
+      - arg: "--kube-apiserver-arg=oidc-client-id=91f5f33c-4ba2-4f37-b7c9-ac0304b15450"
         nodeFilters:
           - server:*
       - arg: "--kube-apiserver-arg=oidc-username-claim=sub"
