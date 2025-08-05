@@ -336,6 +336,8 @@ spec:
           - "--providers.kubernetesingress.ingressendpoint.publishedservice=infrastructure/traefik"
           - "--providers.kubernetesingress"
           - "--tracing.addinternals"
+          - "--experimental.plugins.sablier.modulename=github.com/sablierapp/sablier"
+          - "--experimental.plugins.sablier.version=v1.10.1"
         env:
           - name: POD_NAME
             valueFrom:
@@ -424,3 +426,20 @@ metadata:
     app.kubernetes.io/instance: traefik-infrastructure
 spec:
   controllerName: traefik.io/gateway-controller
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: sablier
+  namespace: infrastructure
+spec:
+  plugin:
+    sablier:
+      group: default
+      dynamic:
+        displayName: Warming Up
+        refreshFrequency: 5s
+        showDetails: "true"
+        theme: hacker-terminal
+      sablierUrl: http://sablier:10000
+      sessionDuration: 1m
