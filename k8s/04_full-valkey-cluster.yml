@@ -38,11 +38,13 @@ spec:
   replicas: 6
   selector:
     matchLabels:
-      app: valkey-cluster
+      app.kubernetes.io/name: valkey-cluster
+      app.kubernetes.io/instance: valkey-cluster
   template:
     metadata:
       labels:
-        app: valkey-cluster
+        app.kubernetes.io/name: valkey-cluster
+        app.kubernetes.io/instance: valkey-cluster
     spec:
       affinity:
         podAntiAffinity:

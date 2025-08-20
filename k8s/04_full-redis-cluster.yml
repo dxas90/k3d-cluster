@@ -38,11 +38,13 @@ spec:
   replicas: 6
   selector:
     matchLabels:
-      app: redis-cluster
+      app.kubernetes.io/name: redis-cluster
+      app.kubernetes.io/instance: redis-cluster
   template:
     metadata:
       labels:
-        app: redis-cluster
+        app.kubernetes.io/name: redis-cluster
+        app.kubernetes.io/instance: redis-cluster
     spec:
       affinity:
         podAntiAffinity:

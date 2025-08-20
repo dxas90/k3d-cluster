@@ -1,9 +1,16 @@
 ---
 # based on https://github.com/rabbitmq/cluster-operator/blob/main/docs/examples/production-ready/rabbitmq.yaml
+# depends on https://github.com/rabbitmq/cluster-operator/releases/latest/download/cluster-operator-quay-io.yml
+# update https://www.rabbitmq.com/kubernetes/operator/using-operator#pause
+# https://www.rabbitmq.com/kubernetes/operator/using-operator#labels-annotations
 apiVersion: rabbitmq.com/v1beta1
 kind: RabbitmqCluster
 metadata:
   name: rabbitmq-production
+  labels:
+    app.kubernetes.io/name: rabbitmq-production
+    app.kubernetes.io/instance: rabbitmq-production
+    app.kubernetes.io/version: v1
 spec:
   replicas: 3
   rabbitmq:
@@ -33,13 +40,13 @@ spec:
       RABBITMQ_LOGS=""
   persistence:
     # storageClassName: ssd
-    storage: "500Gi"
+    storage: "50Gi"
   resources:
     requests:
-      cpu: 2
-      memory: 8Gi
+      cpu: 1000m
+      memory: 2Gi
     limits:
-      memory: 8Gi
+      memory: 2Gi
   affinity:
     podAntiAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
@@ -60,9 +67,8 @@ spec:
             containers: []
             topologySpreadConstraints:
             - maxSkew: 1
-              topologyKey: "topology.kubernetes.io/zone"
+              topologyKey: "topology.kubernetes.io/zone" # Spread pods across zones
               whenUnsatisfiable: DoNotSchedule
               labelSelector:
                 matchLabels:
                   app.kubernetes.io/name: rabbitmq-production
-
