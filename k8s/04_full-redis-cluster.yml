@@ -3,7 +3,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: redis-cluster
-  namespace: infrastructure
   labels:
     app.kubernetes.io/name: redis-cluster
     app.kubernetes.io/instance: redis-cluster
@@ -29,7 +28,6 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: redis-cluster
-  namespace: infrastructure
   labels:
     app.kubernetes.io/name: redis-cluster
     app.kubernetes.io/instance: redis-cluster
@@ -115,7 +113,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: redis-cluster
-  namespace: infrastructure
   labels:
     app.kubernetes.io/name: redis-cluster
     app.kubernetes.io/instance: redis-cluster
@@ -129,13 +126,13 @@ spec:
       targetPort: 16379
       name: gossip
   selector:
-    app: redis-cluster
+    app.kubernetes.io/name: redis-cluster
+    app.kubernetes.io/instance: redis-cluster
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: redis-cluster-init
-  namespace: infrastructure
 spec:
   ttlSecondsAfterFinished: 300
   template:
@@ -144,14 +141,27 @@ spec:
       containers:
       - name: redis-cluster-init
         image: redis:8.2-m01-alpine
+        env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
         command:
         - sh
         - -c
         - |
           echo "Waiting for 6 Redis pods to become ready..."
           for i in $(seq 1 30); do
-            if getent hosts redis-cluster-0.redis-cluster.infrastructure.svc.cluster.local >/dev/null 2>&1 && \
-              getent hosts redis-cluster-5.redis-cluster.infrastructure.svc.cluster.local >/dev/null 2>&1; then
+            if getent hosts redis-cluster-0.redis-cluster.${POD_NAMESPACE}.svc.cluster.local >/dev/null 2>&1 && \
+              getent hosts redis-cluster-5.redis-cluster.${POD_NAMESPACE}.svc.cluster.local >/dev/null 2>&1; then
               READY="ready"
             else
               READY="notready"
@@ -164,16 +174,16 @@ spec:
           done
 
           echo "Checking if cluster is already created..."
-          if redis-cli -h redis-cluster-0.redis-cluster.infrastructure.svc.cluster.local cluster info | grep -q "cluster_state:ok"; then
+          if redis-cli -h redis-cluster-0.redis-cluster.${POD_NAMESPACE}.svc.cluster.local cluster info | grep -q "cluster_state:ok"; then
             echo "Redis cluster already initialized. Skipping."
             exit 0
           fi
 
           echo "Creating Redis cluster..."
           redis-cli --cluster create --cluster-yes --cluster-replicas 1 \
-            $(getent hosts redis-cluster-0.redis-cluster.infrastructure.svc.cluster.local | awk '{print $1 ":6379"}') \
-            $(getent hosts redis-cluster-1.redis-cluster.infrastructure.svc.cluster.local | awk '{print $1 ":6379"}') \
-            $(getent hosts redis-cluster-2.redis-cluster.infrastructure.svc.cluster.local | awk '{print $1 ":6379"}') \
-            $(getent hosts redis-cluster-3.redis-cluster.infrastructure.svc.cluster.local | awk '{print $1 ":6379"}') \
-            $(getent hosts redis-cluster-4.redis-cluster.infrastructure.svc.cluster.local | awk '{print $1 ":6379"}') \
-            $(getent hosts redis-cluster-5.redis-cluster.infrastructure.svc.cluster.local | awk '{print $1 ":6379"}')
+            $(getent hosts redis-cluster-0.redis-cluster.${POD_NAMESPACE}.svc.cluster.local | awk '{print $1 ":6379"}') \
+            $(getent hosts redis-cluster-1.redis-cluster.${POD_NAMESPACE}.svc.cluster.local | awk '{print $1 ":6379"}') \
+            $(getent hosts redis-cluster-2.redis-cluster.${POD_NAMESPACE}.svc.cluster.local | awk '{print $1 ":6379"}') \
+            $(getent hosts redis-cluster-3.redis-cluster.${POD_NAMESPACE}.svc.cluster.local | awk '{print $1 ":6379"}') \
+            $(getent hosts redis-cluster-4.redis-cluster.${POD_NAMESPACE}.svc.cluster.local | awk '{print $1 ":6379"}') \
+            $(getent hosts redis-cluster-5.redis-cluster.${POD_NAMESPACE}.svc.cluster.local | awk '{print $1 ":6379"}')
