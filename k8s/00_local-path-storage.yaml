@@ -80,9 +80,6 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
           resources:
-            limits:
-              cpu: 10m
-              memory: 56Mi
             requests:
               cpu: 10m
               memory: 56Mi

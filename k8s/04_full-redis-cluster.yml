@@ -44,6 +44,19 @@ spec:
       labels:
         app: redis-cluster
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - redis-cluster
+              topologyKey: kubernetes.io/hostname
+            weight: 1
+      automountServiceAccountToken: true
       terminationGracePeriodSeconds: 30
       containers:
         - name: redis
@@ -82,9 +95,6 @@ spec:
             requests:
               cpu: "100m"
               memory: "128Mi"
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
       volumes:
         - name: conf
           configMap:
