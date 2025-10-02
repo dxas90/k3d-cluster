@@ -22,3 +22,5 @@ kubeconfig
 .venv*
 .env
 .vscode
+.mise/
+

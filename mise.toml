@@ -1,0 +1,13 @@
+[tools]
+age = "latest"
+direnv = "latest"
+flux2 = "latest"
+k3d = "latest"
+kubectl = "latest"
+python = { version='3.12', virtualenv='.venv' }
+sops = "latest"
+task = "latest"
+uv = "latest"
+
+[settings]
+experimental = true
