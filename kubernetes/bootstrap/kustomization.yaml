@@ -4,7 +4,7 @@ kind: Kustomization
 resources:
   - ./kube-vip-resources.yaml
   - ./local-path-storage.yaml
-  - github.com/fluxcd/flux2/manifests/install?ref=v2.7.1
+  - github.com/fluxcd/flux2/manifests/install?ref=v2.7.3
 patches:
   - patch: |-
       $patch: delete
