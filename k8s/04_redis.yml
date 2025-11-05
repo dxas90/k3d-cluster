@@ -38,23 +38,11 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: metadata.name
-        volumeMounts:
-        - name: data
-          mountPath: /data
-          readOnly: false
       volumes:
       - name: conf
         configMap:
           name: redis
           defaultMode: 0755
-  volumeClaimTemplates:
-  - metadata:
-      name: data
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      resources:
-        requests:
-          storage: 512M
 ---
 apiVersion: v1
 kind: Service
