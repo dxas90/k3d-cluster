@@ -4,7 +4,7 @@ direnv = "latest"
 flux2 = "latest"
 k3d = "latest"
 kubectl = "latest"
-python = { version='3.14.1', virtualenv='.venv' }
+python = { version='3.14.2', virtualenv='.venv' }
 sops = "latest"
 task = "latest"
 uv = "latest"
