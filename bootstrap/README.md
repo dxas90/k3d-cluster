@@ -1,6 +1,200 @@
-# 🚀 Bootstrap Infrastructure
+# Bootstrap
 
-This directory contains the foundational components needed to bootstrap a Kubernetes cluster with GitOps capabilities using Flux CD.
+This directory contains the foundational Kustomize configuration that brings up the core platform components before GitOps (Flux) can take over ongoing reconciliation.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [What Gets Installed](#what-gets-installed)
+- [Prerequisites](#prerequisites)
+- [Bootstrap Process](#bootstrap-process)
+- [Files](#files)
+- [Verification](#verification)
+- [Troubleshooting](#troubleshooting)
+
+## Overview
+
+```text
+kubectl apply --kustomize bootstrap
+          │
+          ├── Gateway API CRDs (v1.4.0)
+          ├── Prometheus Operator CRDs (v0.86.1)
+          ├── cert-manager (v1.19.1)
+          └── Flux CD (v2.7.5)
+                   │
+                   └── GitOps takes over → reconciles kubernetes/
+```
+
+The bootstrap step is intentionally minimal and idempotent. Running it multiple times is safe.
+
+After bootstrap, the SOPS age secret is applied so Flux can decrypt secrets stored in the repository:
+
+```bash
+sops exec-file "bootstrap/sops-age.sops.yaml" \
+  "kubectl --namespace flux-system apply --server-side --filename {}"
+```
+
+## What Gets Installed
+
+| Component | Version | Purpose |
+|-----------|---------|---------|
+| [Gateway API](https://gateway-api.sigs.k8s.io/) | v1.4.0 | Standard CRDs for ingress/routing |
+| [Prometheus Operator CRDs](https://prometheus-operator.dev/) | v0.86.1 | `ServiceMonitor`, `PrometheusRule`, etc. (stripped-down) |
+| [cert-manager](https://cert-manager.io/) | v1.19.1 | Automatic TLS certificate issuance and renewal |
+| [Flux CD](https://fluxcd.io/) | v2.7.5 | GitOps controllers |
+
+### cert-manager tweaks (via patches)
+
+- DNS-01 recursive nameservers set to Cloudflare (`1.1.1.1`, `1.0.0.1`) over DoH
+- `--dns01-recursive-nameservers-only=true` to avoid leaking queries to authoritative servers
+- Resource limits applied to `cert-manager`, `cert-manager-cainjector`, and `cert-manager-webhook`
+
+### Flux CD tweaks (via patches)
+
+- `--concurrent=10` and `--requeue-dependency=5s` on `kustomize-controller`, `helm-controller`, `source-controller`, and `image-reflector-controller` for faster reconciliation
+- Memory/CPU limits applied to all controller `manager` containers
+- All `NetworkPolicy` resources removed (not needed in k3d)
+
+### Labels
+
+All resources get the following labels via `labels.yaml`:
+
+```yaml
+toolkit.fluxcd.io/tenant: devops-team
+app.kubernetes.io/managed-by: fluxcd
+```
+
+## Prerequisites
+
+- A running Kubernetes cluster with cluster-admin access
+- `kubectl` configured with the correct context
+- `sops` and a valid age private key at `~/.config/sops/age/keys.txt` (for the SOPS step)
+
+All tools are managed by `mise` — run `./mise install` from the repo root.
+
+Quick check:
+
+```bash
+kubectl cluster-info
+kubectl auth can-i '*' '*'
+flux check --pre
+```
+
+## Bootstrap Process
+
+The `mise` task handles this automatically:
+
+```bash
+./mise run bootstrap    # alias: bt
+```
+
+Which runs:
+
+```bash
+kubectl apply --kustomize bootstrap
+sops exec-file "bootstrap/sops-age.sops.yaml" \
+  "kubectl --namespace flux-system apply --server-side --filename {}"
+```
+
+To run manually step-by-step:
+
+```bash
+# Step 1: Apply all platform CRDs and controllers
+kubectl apply --kustomize bootstrap
+
+# Step 2: Wait for Flux to come up
+kubectl rollout status deployment/source-controller -n flux-system
+kubectl rollout status deployment/kustomize-controller -n flux-system
+kubectl rollout status deployment/helm-controller -n flux-system
+kubectl rollout status deployment/notification-controller -n flux-system
+
+# Step 3: Inject the SOPS age key so Flux can decrypt secrets
+sops exec-file "bootstrap/sops-age.sops.yaml" \
+  "kubectl --namespace flux-system apply --server-side --filename {}"
+
+# Step 4: (Optional) Point Flux at a Git repository
+kubectl apply -k kubernetes/
+```
+
+## Files
+
+| File | Description |
+|------|-------------|
+| `kustomization.yaml` | Root Kustomize config — lists remote resources + patches |
+| `labels.yaml` | `LabelTransformer` that stamps all resources with shared labels |
+| `sops-age.sops.yaml` | SOPS-encrypted Kubernetes `Secret` containing the age private key for Flux |
+| `README.md` | This file |
+
+### `sops-age.sops.yaml`
+
+This is a standard Kubernetes `Secret` (namespace: `flux-system`, name: `sops-age`) encrypted with SOPS/age. It is applied with `--server-side` to avoid annotation size limits. Never commit a decrypted version of this file.
+
+To re-encrypt after rotating the key:
+
+```bash
+# Decrypt and re-encrypt with current key in .sops.pub.asc
+sops --rotate --in-place bootstrap/sops-age.sops.yaml
+```
+
+## Verification
+
+After bootstrap completes, confirm healthy status:
+
+```bash
+# All Flux controllers running
+kubectl get pods -n flux-system
+
+# cert-manager running
+kubectl get pods -n cert-manager
+
+# Gateway API CRDs registered
+kubectl get crd | grep gateway.networking.k8s.io
+
+# Prometheus Operator CRDs registered
+kubectl get crd | grep monitoring.coreos.com
+
+# SOPS age key present
+kubectl get secret sops-age -n flux-system
+
+# Full Flux health check
+flux check
+```
+
+## Troubleshooting
+
+**cert-manager pods crash-loop:**
+
+```bash
+kubectl logs -n cert-manager -l app=cert-manager
+kubectl describe pods -n cert-manager
+```
+
+**Flux controllers not starting:**
+
+```bash
+kubectl get events -n flux-system --sort-by='.lastTimestamp'
+kubectl logs -n flux-system -l app=source-controller
+# Check RBAC
+kubectl auth can-i '*' '*' \
+  --as=system:serviceaccount:flux-system:source-controller
+```
+
+**SOPS age Secret missing / decryption failures:**
+
+```bash
+kubectl get secret sops-age -n flux-system
+# Re-apply manually if missing
+sops exec-file bootstrap/sops-age.sops.yaml \
+  "kubectl --namespace flux-system apply --server-side --filename {}"
+```
+
+**Full reset:**
+
+```bash
+kubectl delete namespace flux-system cert-manager
+kubectl delete -k bootstrap
+./mise run bootstrap
+```
 
 ## 📋 Table of Contents
 
@@ -204,7 +398,7 @@ kubectl get pods -l app=redis
 
 **Flux System Pods:**
 
-```
+```text
 NAME                                       READY   STATUS    RESTARTS
 helm-controller-xxx                        1/1     Running   0
 kustomize-controller-xxx                   1/1     Running   0
@@ -214,7 +408,7 @@ source-controller-xxx                      1/1     Running   0
 
 **Storage Classes:**
 
-```
+```text
 NAME         PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE
 local-path   rancher.io/local-path   Delete          WaitForFirstConsumer
 ```
