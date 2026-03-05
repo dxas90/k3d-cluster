@@ -1,0 +1,11 @@
+apiVersion: builtin
+kind: LabelTransformer
+metadata:
+  name: labels
+labels:
+  toolkit.fluxcd.io/tenant: devops-team
+  app.kubernetes.io/managed-by: fluxcd
+fieldSpecs:
+  - path: metadata/labels
+    kind: Namespace
+    create: true

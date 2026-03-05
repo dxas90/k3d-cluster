@@ -19,9 +19,6 @@ volumes:
   - volume: ${SHARED_PATH}:/mnt/shared
     nodeFilters:
       - all
-  - volume: ${SHARED_PATH}/default-local-pv:/opt/local-path-provisioner
-    nodeFilters:
-      - all
 ports:
   # https://ranchermanager.docs.rancher.com/reference-guides/cluster-configuration/rancher-server-configuration/k3s-cluster-configuration#nodeport-service-port-range
   # - port: ${CURRENT_IP}:32600-32767:32600-32767 # a range of k3s nodeports exposed on host https://docs.k3s.io/cli/server#networking
@@ -45,16 +42,13 @@ options:
         - settings.workerConnections=2048
   k3s:
     extraArgs:
-      - arg: --disable=traefik,servicelb,local-storage,metrics-server
+      - arg: --disable=traefik,servicelb,metrics-server
         nodeFilters:
           - server:*
       - arg: --tls-san=${CURRENT_IP}
         nodeFilters:
           - server:*
       - arg: --tls-san=${CURRENT_EXTERNAL_IP}
-        nodeFilters:
-          - server:*
-      - arg: --tls-san=dxas90.duckdns.org
         nodeFilters:
           - server:*
       - arg: --kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%
@@ -66,24 +60,6 @@ options:
       - arg: --kube-proxy-arg=conntrack-max-per-core=0
         nodeFilters:
           - agent:*
-          - server:*
-      - arg: "--kube-apiserver-arg=oidc-issuer-url=https://id.5rv.me"
-        nodeFilters:
-          - server:*
-      - arg: "--kube-apiserver-arg=oidc-client-id=91f5f33c-4ba2-4f37-b7c9-ac0304b15450"
-        nodeFilters:
-          - server:*
-      - arg: "--kube-apiserver-arg=oidc-username-claim=sub"
-        nodeFilters:
-          - server:*
-      - arg: "--kube-apiserver-arg=oidc-username-prefix=idp:"
-        nodeFilters:
-          - server:*
-      - arg: "--kube-apiserver-arg=oidc-groups-claim=groups"
-        nodeFilters:
-          - server:*
-      - arg: "--kube-apiserver-arg=oidc-groups-prefix=idp-groups:"
-        nodeFilters:
           - server:*
     nodeLabels:
       - label: nerdctl/bypass4netns=true

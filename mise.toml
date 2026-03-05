@@ -4,7 +4,7 @@ direnv = "latest"
 flux2 = "latest"
 k3d = "latest"
 kubectl = "latest"
-python = { version='3.14.2', virtualenv='.venv' }
+python = { version='3', virtualenv='.venv' }
 sops = "latest"
 task = "latest"
 uv = "latest"
@@ -16,6 +16,53 @@ python.uv_venv_auto = true
 [env]
 # Use the project name derived from the current directory
 PROJECT_NAME = "{{ config_root | basename }}"
+CLUSTER_NAME = "default"
+PATH = "{{ env.HOME }}/.local/bin:{{ env.PATH }}"
 
 # Automatic virtualenv activation
-_.python.venv = { path = ".venv", create = true }
+_.python.venv = { path = ".venv", create = true, python_create_args = ["--without-pip", "--copies"], uv_create_args = ["--system-site-packages"] }
+LC_ALL = "en_US.UTF-8"
+LC_CTYPE = "en_US.UTF-8"
+
+DEFAULT_IFACE = "{{ exec(command='ip route | grep default | head -n 1 | cut -d \" \" -f 5') }}"
+CURRENT_IP = "{{ exec(command='ip addr show ' ~ env.DEFAULT_IFACE ~ ' | grep inet | cut -d \"/\" -f 1 | cut -d \"t\" -f 2 | tr -d \" \" | head -n 1') }}"
+CURRENT_EXTERNAL_IP = "{{ exec(command='curl -sSL ipinfo.io/ip') }}"
+SECRET_KEY="{{ exec(command='python3 -c \"import os, base64; print(base64.b64encode(os.urandom(128)).decode())\"') }}"
+
+SOPS_AGE_KEY_FILE = "{{ env.HOME }}/.config/sops/age/keys.txt"
+SOPS_AGE_RECIPIENTS = "{{ read_file(path='.sops.pub.asc') | trim }}"
+ISSUER_EMAIL = "yourname@gmail.com"
+SHARED_PATH = "{{ env.HOME }}/projects"
+LATEST_K3S_VERSION = "{{ exec(command='curl -sL https://api.github.com/repos/k3s-io/k3s/releases/latest | jq -r \".tag_name\"') }}"
+K3S_VERSION = "{{ env.LATEST_K3S_VERSION | replace(from='+', to='-') }}"
+
+# tasks
+[tasks.create-cluster]
+description = "Create a k3d cluster with default components"
+alias = 'cc'
+run = [
+  "echo 'Creating cluster {{ env.CLUSTER_NAME }} with default components with {{ env.SHARED_PATH }} as a shared path'",
+  "mkdir -p {{ env.SHARED_PATH }}/default-local-pv",
+  "envsubst < k3d-config.yaml | cat > /tmp/k3d-config.yaml",
+  "k3d cluster list --no-headers | grep {{ env.CLUSTER_NAME }} > /dev/null 2>&1 || k3d cluster create -c /tmp/k3d-config.yaml",
+  "kubectl create ns infrastructure > /dev/null 2>&1 || true"
+]
+
+
+[tasks.delete-cluster]
+description = "Delete a k3d cluster"
+alias = 'dc'
+run = [
+  "echo 'Deleting cluster {{ env.CLUSTER_NAME }}'",
+  "k3d cluster delete {{ env.CLUSTER_NAME }} || true"
+]
+
+[tasks.bootstrap]
+description = "Bootstrap cluster with default components"
+alias = 'bt'
+run = [
+  "echo 'Bootstraping cluster {{ env.CLUSTER_NAME }} with default components'",
+  "kubectl apply --kustomize bootstrap",
+#   "kubectl create secret generic infra-gitlab-deploy-key --namespace=flux-system --from-file=identity=infra-gitlab-deploy-key --from-file=identity.pub=infra-gitlab-deploy-key.pub --from-literal=known_hosts=\"$(ssh-keyscan gitlab.example.com 2>/dev/null)\" || true",
+  "sops exec-file \"bootstrap/sops-age.sops.yaml\" \"kubectl --namespace flux-system apply --server-side --filename {}\" || true"
+]

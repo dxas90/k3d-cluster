@@ -1,0 +1,191 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+transformers:
+  - labels.yaml
+resources:
+  - https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+  - https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.86.1/stripped-down-crds.yaml
+  - https://github.com/jetstack/cert-manager/releases/download/v1.19.1/cert-manager.yaml
+  - github.com/fluxcd/flux2/manifests/install?ref=v2.7.5
+patches:
+  - patch: |-
+      $patch: delete
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: not-used
+    target:
+      group: networking.k8s.io
+      kind: NetworkPolicy
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --dns01-recursive-nameservers=https://1.1.1.1:443/dns-query,https://1.0.0.1:443/dns-query
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --dns01-recursive-nameservers-only=true
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          limits:
+            cpu: 200m
+            memory: 300Mi
+          requests:
+            cpu: 100m
+            memory: 150Mi
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: cert-manager
+      namespace: cert-manager
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          limits:
+            cpu: 200m
+            memory: 300Mi
+          requests:
+            cpu: 100m
+            memory: 150Mi
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: cert-manager-cainjector
+      namespace: cert-manager
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          limits:
+            cpu: 200m
+            memory: 300Mi
+          requests:
+            cpu: 100m
+            memory: 150Mi
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: cert-manager-webhook
+      namespace: cert-manager
+  - # Increase the number of workers
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --concurrent=10
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --requeue-dependency=5s
+    target:
+      kind: Deployment
+      name: (kustomize-controller|helm-controller|source-controller|image-reflector-controller)
+  - # Increase the memory limits
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: all
+      spec:
+        template:
+          spec:
+            containers:
+              - name: manager
+                resources:
+                  limits:
+                    memory: 512Mi
+                    cpu: 250m
+    target:
+      kind: Deployment
+      name: (kustomize-controller|helm-controller|source-controller|image-reflector-controller|image-automation-controller|notification-controller)
+  - # Enable in-memory kustomize builds
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --concurrent=20
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: temp
+          emptyDir:
+            medium: Memory
+    target:
+      kind: Deployment
+      name: kustomize-controller
+  - # Enable Helm repositories caching
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --helm-cache-max-size=10
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --helm-cache-ttl=60m
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --helm-cache-purge-interval=5m
+    target:
+      kind: Deployment
+      name: source-controller
+  - # Flux near OOM detection for Helm
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --feature-gates=OOMWatch=true
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --oom-watch-memory-threshold=95
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --oom-watch-interval=500ms
+    target:
+      kind: Deployment
+      name: helm-controller
+  - # Disable chart digest tracking
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --feature-gates=DisableChartDigestTracking=true
+    target:
+      kind: Deployment
+      name: helm-controller
+  - # Controller-level SOPS decryption
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --sops-age-secret=sops-age
+    target:
+      kind: Deployment
+      name: kustomize-controller
+  - patch: | # AWS IAM Role for Service Account for Image Repository Access https://fluxcd.io/flux/components/image/imagerepositories/#iam-roles-for-service-accountsirsa
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: image-reflector-controller
+        annotations:
+          eks.amazonaws.com/role-arn: arn:aws:iam::053250053617:role/secretsy-staging-us-flux-image-reflector
+    target:
+      kind: ServiceAccount
+      name: image-reflector-controller
+  - # Watch configmaps and secrets attached to HelmReleases and Kustomizations
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --watch-configs-label-selector=owner!=helm
+    target:
+      kind: Deployment
+      name: (helm-controller|kustomize-controller)
+  - patch: |-
+      - op: add
+        path: /metadata/labels
+        value:
+          toolkit.fluxcd.io/tenant: devops-team
+          app.kubernetes.io/app: cert-manager
+          app.kubernetes.io/version: v1.19.1
+          istio.io/dataplane-mode: ambient
+    target:
+      version: v1
+      kind: Namespace
+      name: cert-manager
